@@ -1,0 +1,2 @@
+# server:
+uri: mongodb://localhost:27017
