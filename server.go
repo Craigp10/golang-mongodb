@@ -89,6 +89,8 @@ func (c *Client) Ping() {
 
 	if err != nil {
 		log.Fatal(err)
+	} else {
+		fmt.Println("Ping Successful!")
 	}
 }
 
@@ -201,27 +203,4 @@ type Trainer struct {
 	Name string
 	Age  int
 	City string
-}
-
-func main1() {
-	// Set client options
-	clientOptions := options.Client().ApplyURI("mongodb://localhost:27017")
-
-	// Connect to MongoDB
-	client, err := mongo.Connect(context.TODO(), clientOptions)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Check the connection
-	err = client.Ping(context.TODO(), nil)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Println("Connected to MongoDB!")
-
-	// Disconnect(client)
 }
