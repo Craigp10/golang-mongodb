@@ -15,3 +15,15 @@ Pre-requistes
 # To Run Mongodb server locally execute the below command (Replace the user path with account name)
 
 mongod --dbpath=/Users/{user}/data/db
+
+docker run -d golang-mongodb... make sure we're running mongodb first
+
+TODO:
+Add mongodb container to run w/ image... Ignore golang image because it isn't a server yet so no point in running it.
+We can add that next iteration
+
+# Run Docker image (Latest) on port 27017
+
+# docker run -d -p 27017:27017 --name test-mongo mongo:latest
+
+<!-- docker run -d -p 27017:27017 mongo:latest -->

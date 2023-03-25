@@ -1,11 +1,15 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"log"
 	"os"
 
 	"context"
+	"net/http"
 
 	"github.com/kelseyhightower/envconfig"
 	"gopkg.in/yaml.v2"
@@ -22,6 +26,90 @@ type Config struct {
 type Client struct {
 	Config
 	mClient *mongo.Client
+}
+
+func Server() {
+	fmt.Println("Running server")
+	c := New()
+	c.Connect()
+
+	mux := http.NewServeMux()
+	// Endpoint paths should only contain nouns
+	mux.HandleFunc("/mongo/add", c.add)
+	mux.HandleFunc("/mongo/update", c.update)
+	mux.HandleFunc("/mongo/remove", c.remove)
+	mux.HandleFunc("/mongo/find", c.find)
+	// mux.Handler(r)
+
+	err := http.ListenAndServe(":8080", mux)
+	if err != nil {
+		log.Fatal("error starting server", err)
+	} else {
+		fmt.Print("Server started!")
+	}
+}
+
+// curl -X POST http://localhost:8080/mongo/add -H "Content-Type: application/json" -d '{"Name":"Ash", "Age":21, "City": "Gresham"}'
+func (c *Client) add(w http.ResponseWriter, r *http.Request) {
+	// io.WriteString(w, "This is my website!\n")
+	var t Trainer
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		fmt.Printf("could not read body: %s\n", err)
+	}
+
+	// myName := r.PostFormValue("Name")
+	err = json.Unmarshal(body, &t)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("Adding to mongo database", t)
+	collection := c.mClient.Database("test").Collection("trainers")
+	id, err := c.Insert(collection, []*Trainer{&t})
+	if err != nil {
+		fmt.Print("Error inserting", err)
+	} else {
+		io.WriteString(w, fmt.Sprintf("Successfully Inserted! Id is %v\n", id[0]))
+	}
+}
+
+// Not implemented
+func (c *Client) update(w http.ResponseWriter, r *http.Request) {
+
+	io.WriteString(w, "Hello, HTTP!\n")
+}
+
+type TrainerDelete struct {
+	id string
+}
+
+// Not setup
+func (c *Client) remove(w http.ResponseWriter, r *http.Request) {
+	var d TrainerDelete
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		fmt.Printf("could not read body: %s\n", err)
+	}
+
+	// myName := r.PostFormValue("Name")
+	err = json.Unmarshal(body, &d)
+	if err != nil {
+		panic(err)
+	}
+	io.WriteString(w, fmt.Sprintf("Deleting, %s!\n", d.id))
+}
+
+// curl http://localhost:8080/mongo/find?name=Ash
+func (c *Client) find(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+	fmt.Println("QUERY", query["name"])
+	filter := bson.D{{"name", query["name"][0]}}
+	collection := c.mClient.Database("test").Collection("trainers")
+	trainers, err := c.Find(collection, filter)
+	if err != nil {
+		panic(err)
+	}
+	io.WriteString(w, fmt.Sprintf("Hello, trainer %s \n", trainers[0].Name))
 }
 
 func (c *Client) CreateDefaultConfig() *Config {
@@ -103,14 +191,16 @@ func (c *Client) Disconnect() {
 	fmt.Println("Connection to MongoDB closed.")
 }
 
-func (c *Client) Insert(collection *mongo.Collection, data []*Trainer) error {
+func (c *Client) Insert(collection *mongo.Collection, data []*Trainer) ([]interface{}, error) {
+	var ids []interface{}
 	if len(data) == 1 {
 		insertResult, err := collection.InsertOne(context.TODO(), data[0])
 		if err != nil {
 			fmt.Println(err)
-			return err
+			return nil, err
 		}
 		fmt.Println("Inserted a single document: ", insertResult.InsertedID)
+		ids = append(ids, insertResult.InsertedID)
 	} else {
 		p := make([]interface{}, len(data))
 		for i, v := range data {
@@ -125,17 +215,18 @@ func (c *Client) Insert(collection *mongo.Collection, data []*Trainer) error {
 		fmt.Println("Inserted multiple documents: ", insertManyResult.InsertedIDs)
 	}
 
-	return nil
+	return ids, nil
 }
 
 func (c *Client) Delete(collection *mongo.Collection, filter bson.D) error {
-	deleteResult, err := collection.DeleteMany(context.TODO(), bson.D{{}})
+	deleteResult, err := collection.DeleteMany(context.TODO(), filter)
 	if err != nil {
 		return nil
 	}
 	fmt.Printf("Deleted %v documents in the trainers collection\n", deleteResult.DeletedCount)
 	return nil
 }
+
 func (c *Client) Find(collection *mongo.Collection, filter bson.D) ([]*Trainer, error) {
 	var results []*Trainer
 	var result *Trainer
@@ -174,12 +265,12 @@ func (c *Client) DummyData() {
 	}
 
 	trainers := []*Trainer{&ash}
-	err := c.Insert(collection, trainers)
+	_, err := c.Insert(collection, trainers)
 	if err != nil {
 		panic(err)
 	}
 	trainers = []*Trainer{&misty, &brock}
-	err = c.Insert(collection, trainers)
+	_, err = c.Insert(collection, trainers)
 	if err != nil {
 		panic(err)
 	}
@@ -192,11 +283,18 @@ func (c *Client) DummyData() {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("Found", updateResult)
+	fmt.Println("updated", updateResult)
 	err = c.Delete(collection, filter)
 	if err != nil {
 		panic(err)
 	}
+	fmt.Println("Deleted", filter)
+	result, err = c.Find(collection, filter)
+	if err == nil {
+		panic(err)
+	}
+	fmt.Println("No one found", result)
+
 }
 
 type Trainer struct {
