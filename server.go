@@ -35,10 +35,12 @@ func Server() {
 
 	mux := http.NewServeMux()
 	// Endpoint paths should only contain nouns
+	mux.HandleFunc("/", c.update)
 	mux.HandleFunc("/mongo/add", c.add)
 	mux.HandleFunc("/mongo/update", c.update)
 	mux.HandleFunc("/mongo/remove", c.remove)
 	mux.HandleFunc("/mongo/find", c.find)
+	mux.HandleFunc("/mongo/dummy", c.dummy)
 	// mux.Handler(r)
 
 	err := http.ListenAndServe(":8080", mux)
@@ -77,6 +79,11 @@ func (c *Client) add(w http.ResponseWriter, r *http.Request) {
 func (c *Client) update(w http.ResponseWriter, r *http.Request) {
 
 	io.WriteString(w, "Hello, HTTP!\n")
+}
+
+func (c *Client) dummy(w http.ResponseWriter, r *http.Request) {
+
+	c.DummyData()
 }
 
 type TrainerDelete struct {
